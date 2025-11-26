@@ -14,7 +14,75 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      diagnoses: {
+        Row: {
+          ai_score: number | null
+          created_at: string
+          description: string | null
+          disease: string
+          id: string
+          medicines: string[] | null
+          notes: string | null
+          rule_score: number | null
+          severity: string
+          symptoms: string[]
+          user_id: string
+        }
+        Insert: {
+          ai_score?: number | null
+          created_at?: string
+          description?: string | null
+          disease: string
+          id?: string
+          medicines?: string[] | null
+          notes?: string | null
+          rule_score?: number | null
+          severity: string
+          symptoms?: string[]
+          user_id: string
+        }
+        Update: {
+          ai_score?: number | null
+          created_at?: string
+          description?: string | null
+          disease?: string
+          id?: string
+          medicines?: string[] | null
+          notes?: string | null
+          rule_score?: number | null
+          severity?: string
+          symptoms?: string[]
+          user_id?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          full_name: string | null
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          full_name?: string | null
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          full_name?: string | null
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

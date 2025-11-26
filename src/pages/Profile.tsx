@@ -14,8 +14,11 @@ import {
   FileText,
   Bell,
   HelpCircle,
+  Loader2,
 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
+import { useToast } from "@/hooks/use-toast";
 
 const menuItems = [
   { icon: Bell, label: "Notifications", to: "#" },
@@ -25,12 +28,31 @@ const menuItems = [
 ];
 
 export default function Profile() {
-  // Mock user - in real app, this would come from auth context
-  const isLoggedIn = false;
-  const user = {
-    name: "Guest User",
-    email: "Not signed in",
+  const { user, loading, signOut } = useAuth();
+  const { toast } = useToast();
+  const navigate = useNavigate();
+
+  const handleSignOut = async () => {
+    await signOut();
+    toast({
+      title: "Signed out",
+      description: "You've been successfully signed out.",
+    });
+    navigate("/");
   };
+
+  const displayName = user?.user_metadata?.full_name || user?.email?.split("@")[0] || "Guest User";
+  const displayEmail = user?.email || "Not signed in";
+
+  if (loading) {
+    return (
+      <AppLayout>
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      </AppLayout>
+    );
+  }
 
   return (
     <AppLayout>
@@ -57,18 +79,18 @@ export default function Profile() {
           <Card variant="glass">
             <CardContent className="flex items-center gap-4 py-6">
               <Avatar className="h-16 w-16 border-2 border-primary/30">
-                <AvatarImage src="" />
+                <AvatarImage src={user?.user_metadata?.avatar_url || ""} />
                 <AvatarFallback className="bg-primary/20 text-primary text-xl font-bold">
-                  {user.name.charAt(0)}
+                  {displayName.charAt(0).toUpperCase()}
                 </AvatarFallback>
               </Avatar>
               <div className="flex-1">
                 <h2 className="font-semibold text-foreground text-lg">
-                  {user.name}
+                  {displayName}
                 </h2>
                 <p className="text-sm text-muted-foreground flex items-center gap-1">
                   <Mail className="h-3 w-3" />
-                  {user.email}
+                  {displayEmail}
                 </p>
               </div>
             </CardContent>
@@ -76,7 +98,7 @@ export default function Profile() {
         </motion.div>
 
         {/* Auth Buttons */}
-        {!isLoggedIn && (
+        {!user && (
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -153,13 +175,17 @@ export default function Profile() {
         </motion.div>
 
         {/* Sign Out (if logged in) */}
-        {isLoggedIn && (
+        {user && (
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.5 }}
           >
-            <Button variant="outline" className="w-full gap-2 text-destructive border-destructive/30 hover:bg-destructive/10">
+            <Button 
+              variant="outline" 
+              className="w-full gap-2 text-destructive border-destructive/30 hover:bg-destructive/10"
+              onClick={handleSignOut}
+            >
               <LogOut className="h-4 w-4" />
               Sign Out
             </Button>
