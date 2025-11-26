@@ -1,30 +1,31 @@
+import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { DiagnosisCard, DiagnosisData } from "@/components/diagnosis/DiagnosisCard";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { ArrowLeft, Save, AlertCircle, CheckCircle } from "lucide-react";
+import { ArrowLeft, Save, AlertCircle, CheckCircle, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
+import { saveDiagnosis } from "@/lib/diagnoses";
 
 // Mock diagnosis result - in real app, this would come from AI analysis
-const mockDiagnosis: DiagnosisData = {
-  id: "1",
+const mockDiagnosis: Omit<DiagnosisData, "symptoms" | "severity" | "notes" | "createdAt"> = {
+  id: "temp",
   disease: "Common Cold",
   description: "A viral infection of the upper respiratory tract. Usually harmless and resolves within 7-10 days. Rest and hydration are recommended.",
-  symptoms: [],
-  severity: "mild",
   medicines: ["Acetaminophen", "Decongestant", "Throat lozenges", "Vitamin C"],
   aiScore: 0.85,
   ruleScore: 0.78,
-  notes: "",
-  createdAt: new Date(),
 };
 
 export default function Results() {
   const location = useLocation();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { user } = useAuth();
+  const [isSaving, setIsSaving] = useState(false);
   
   const state = location.state as {
     symptoms: string[];
@@ -54,15 +55,49 @@ export default function Results() {
     symptoms: state.symptoms,
     severity: state.severity as "mild" | "moderate" | "severe",
     notes: state.notes,
+    createdAt: new Date(),
   };
 
-  const handleSave = () => {
-    // In real app, save to database
-    toast({
-      title: "Diagnosis Saved",
-      description: "Your diagnosis has been saved to your history.",
-    });
-    navigate("/history");
+  const handleSave = async () => {
+    if (!user) {
+      toast({
+        title: "Sign in required",
+        description: "Please sign in to save your diagnosis to history.",
+        variant: "destructive",
+      });
+      navigate("/auth");
+      return;
+    }
+
+    setIsSaving(true);
+
+    try {
+      await saveDiagnosis({
+        disease: diagnosis.disease,
+        description: diagnosis.description,
+        symptoms: diagnosis.symptoms,
+        severity: diagnosis.severity,
+        medicines: diagnosis.medicines,
+        ai_score: diagnosis.aiScore,
+        rule_score: diagnosis.ruleScore,
+        notes: diagnosis.notes || null,
+      });
+
+      toast({
+        title: "Diagnosis Saved",
+        description: "Your diagnosis has been saved to your history.",
+      });
+      navigate("/history");
+    } catch (error) {
+      console.error("Error saving diagnosis:", error);
+      toast({
+        variant: "destructive",
+        title: "Save failed",
+        description: "There was an error saving your diagnosis. Please try again.",
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -142,9 +177,23 @@ export default function Results() {
           transition={{ delay: 0.4 }}
           className="space-y-3"
         >
-          <Button size="lg" className="w-full gap-2" onClick={handleSave}>
-            <Save className="h-5 w-5" />
-            Save to History
+          <Button 
+            size="lg" 
+            className="w-full gap-2" 
+            onClick={handleSave}
+            disabled={isSaving}
+          >
+            {isSaving ? (
+              <>
+                <Loader2 className="h-5 w-5 animate-spin" />
+                Saving...
+              </>
+            ) : (
+              <>
+                <Save className="h-5 w-5" />
+                {user ? "Save to History" : "Sign In to Save"}
+              </>
+            )}
           </Button>
           
           <Button

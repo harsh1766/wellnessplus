@@ -1,40 +1,62 @@
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { DiagnosisCard, DiagnosisData } from "@/components/diagnosis/DiagnosisCard";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Clock, Plus, FileX } from "lucide-react";
+import { Clock, Plus, FileX, Loader2 } from "lucide-react";
 import { Link } from "react-router-dom";
-
-// Mock history data - in real app, this would come from database
-const mockHistory: DiagnosisData[] = [
-  {
-    id: "1",
-    disease: "Common Cold",
-    description: "A viral infection of the upper respiratory tract affecting the nose and throat.",
-    symptoms: ["Headache", "Cough", "Runny Nose", "Fatigue"],
-    severity: "mild",
-    medicines: ["Acetaminophen", "Decongestant", "Rest"],
-    aiScore: 0.85,
-    ruleScore: 0.78,
-    notes: "Started feeling unwell after the rain yesterday",
-    createdAt: new Date(Date.now() - 86400000),
-  },
-  {
-    id: "2",
-    disease: "Tension Headache",
-    description: "A common type of headache characterized by mild to moderate pain, often described as feeling like a tight band around the head.",
-    symptoms: ["Headache", "Neck Pain", "Fatigue"],
-    severity: "moderate",
-    medicines: ["Ibuprofen", "Muscle relaxant"],
-    aiScore: 0.72,
-    ruleScore: 0.65,
-    createdAt: new Date(Date.now() - 172800000),
-  },
-];
+import { useAuth } from "@/contexts/AuthContext";
+import { getDiagnoses, Diagnosis } from "@/lib/diagnoses";
 
 export default function History() {
-  const hasHistory = mockHistory.length > 0;
+  const { user } = useAuth();
+  const [diagnoses, setDiagnoses] = useState<DiagnosisData[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchDiagnoses() {
+      if (!user) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const data = await getDiagnoses();
+        const formattedDiagnoses: DiagnosisData[] = data.map((d: Diagnosis) => ({
+          id: d.id,
+          disease: d.disease,
+          description: d.description || "",
+          symptoms: d.symptoms,
+          severity: d.severity,
+          medicines: d.medicines || [],
+          aiScore: Number(d.ai_score) || 0,
+          ruleScore: Number(d.rule_score) || 0,
+          notes: d.notes || undefined,
+          createdAt: new Date(d.created_at),
+        }));
+        setDiagnoses(formattedDiagnoses);
+      } catch (error) {
+        console.error("Error fetching diagnoses:", error);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchDiagnoses();
+  }, [user]);
+
+  const hasHistory = diagnoses.length > 0;
+
+  if (loading) {
+    return (
+      <AppLayout>
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      </AppLayout>
+    );
+  }
 
   return (
     <AppLayout>
@@ -60,7 +82,28 @@ export default function History() {
           </div>
         </motion.div>
 
-        {hasHistory ? (
+        {!user ? (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="flex flex-col items-center justify-center py-16 text-center"
+          >
+            <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-muted">
+              <FileX className="h-10 w-10 text-muted-foreground" />
+            </div>
+            <h2 className="text-xl font-semibold text-foreground mb-2">
+              Sign In Required
+            </h2>
+            <p className="text-muted-foreground text-sm mb-6 max-w-xs">
+              Sign in to view and save your diagnosis history across devices.
+            </p>
+            <Link to="/auth">
+              <Button className="gap-2">
+                Sign In to View History
+              </Button>
+            </Link>
+          </motion.div>
+        ) : hasHistory ? (
           <>
             {/* Stats Summary */}
             <motion.div
@@ -73,19 +116,19 @@ export default function History() {
                 <CardContent className="grid grid-cols-3 gap-4 py-4">
                   <div className="text-center">
                     <p className="text-2xl font-bold text-foreground">
-                      {mockHistory.length}
+                      {diagnoses.length}
                     </p>
                     <p className="text-xs text-muted-foreground">Total Records</p>
                   </div>
                   <div className="text-center border-x border-border">
                     <p className="text-2xl font-bold text-success">
-                      {mockHistory.filter((d) => d.severity === "mild").length}
+                      {diagnoses.filter((d) => d.severity === "mild").length}
                     </p>
                     <p className="text-xs text-muted-foreground">Mild Cases</p>
                   </div>
                   <div className="text-center">
                     <p className="text-2xl font-bold text-warning">
-                      {mockHistory.filter((d) => d.severity !== "mild").length}
+                      {diagnoses.filter((d) => d.severity !== "mild").length}
                     </p>
                     <p className="text-xs text-muted-foreground">Moderate+</p>
                   </div>
@@ -95,7 +138,7 @@ export default function History() {
 
             {/* History List */}
             <div className="space-y-4">
-              {mockHistory.map((diagnosis, index) => (
+              {diagnoses.map((diagnosis, index) => (
                 <DiagnosisCard
                   key={diagnosis.id}
                   diagnosis={diagnosis}

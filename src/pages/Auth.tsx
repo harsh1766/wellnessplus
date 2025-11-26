@@ -1,18 +1,20 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
-import { Activity, Mail, Lock, User, ArrowLeft, Chrome } from "lucide-react";
+import { Activity, Mail, Lock, User, ArrowLeft, Chrome, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function Auth() {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { user, signIn, signUp, signInWithGoogle } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   
   // Form state
@@ -22,45 +24,75 @@ export default function Auth() {
   const [signupEmail, setSignupEmail] = useState("");
   const [signupPassword, setSignupPassword] = useState("");
 
+  // Redirect if already logged in
+  useEffect(() => {
+    if (user) {
+      navigate("/");
+    }
+  }, [user, navigate]);
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     
-    // Placeholder - will be implemented with Supabase
-    setTimeout(() => {
-      setIsLoading(false);
+    const { error } = await signIn(loginEmail, loginPassword);
+    
+    setIsLoading(false);
+    
+    if (error) {
       toast({
-        title: "Coming Soon",
-        description: "Authentication will be available after connecting to Lovable Cloud.",
+        variant: "destructive",
+        title: "Sign in failed",
+        description: error.message || "Please check your credentials and try again.",
       });
-    }, 1000);
+    } else {
+      toast({
+        title: "Welcome back!",
+        description: "You've successfully signed in.",
+      });
+      navigate("/");
+    }
   };
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     
-    // Placeholder - will be implemented with Supabase
-    setTimeout(() => {
-      setIsLoading(false);
+    const { error } = await signUp(signupEmail, signupPassword, signupName);
+    
+    setIsLoading(false);
+    
+    if (error) {
       toast({
-        title: "Coming Soon",
-        description: "Authentication will be available after connecting to Lovable Cloud.",
+        variant: "destructive",
+        title: "Sign up failed",
+        description: error.message || "Please try again with different credentials.",
       });
-    }, 1000);
+    } else {
+      toast({
+        title: "Account created!",
+        description: "Welcome to Wellness+. You're now signed in.",
+      });
+      navigate("/");
+    }
   };
 
-  const handleGoogleLogin = () => {
-    toast({
-      title: "Coming Soon",
-      description: "Google login will be available after connecting to Lovable Cloud.",
-    });
+  const handleGoogleLogin = async () => {
+    const { error } = await signInWithGoogle();
+    
+    if (error) {
+      toast({
+        variant: "destructive",
+        title: "Google sign in failed",
+        description: "Please try again or use email/password.",
+      });
+    }
   };
 
   const handleGuestContinue = () => {
     toast({
       title: "Continuing as Guest",
-      description: "Your data will only be stored locally.",
+      description: "Your data will only be stored locally. Sign in to save your diagnoses.",
     });
     navigate("/");
   };
@@ -131,6 +163,7 @@ export default function Auth() {
                           value={loginEmail}
                           onChange={(e) => setLoginEmail(e.target.value)}
                           required
+                          disabled={isLoading}
                         />
                       </div>
                       <div className="relative">
@@ -142,6 +175,7 @@ export default function Auth() {
                           value={loginPassword}
                           onChange={(e) => setLoginPassword(e.target.value)}
                           required
+                          disabled={isLoading}
                         />
                       </div>
                     </div>
@@ -151,7 +185,14 @@ export default function Auth() {
                       className="w-full"
                       disabled={isLoading}
                     >
-                      {isLoading ? "Signing in..." : "Sign In"}
+                      {isLoading ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Signing in...
+                        </>
+                      ) : (
+                        "Sign In"
+                      )}
                     </Button>
                   </form>
                 </TabsContent>
@@ -169,6 +210,7 @@ export default function Auth() {
                           value={signupName}
                           onChange={(e) => setSignupName(e.target.value)}
                           required
+                          disabled={isLoading}
                         />
                       </div>
                       <div className="relative">
@@ -180,6 +222,7 @@ export default function Auth() {
                           value={signupEmail}
                           onChange={(e) => setSignupEmail(e.target.value)}
                           required
+                          disabled={isLoading}
                         />
                       </div>
                       <div className="relative">
@@ -192,6 +235,7 @@ export default function Auth() {
                           onChange={(e) => setSignupPassword(e.target.value)}
                           required
                           minLength={6}
+                          disabled={isLoading}
                         />
                       </div>
                     </div>
@@ -201,7 +245,14 @@ export default function Auth() {
                       className="w-full"
                       disabled={isLoading}
                     >
-                      {isLoading ? "Creating account..." : "Create Account"}
+                      {isLoading ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Creating account...
+                        </>
+                      ) : (
+                        "Create Account"
+                      )}
                     </Button>
                   </form>
                 </TabsContent>
@@ -221,6 +272,7 @@ export default function Auth() {
                   variant="outline"
                   className="w-full gap-2"
                   onClick={handleGoogleLogin}
+                  disabled={isLoading}
                 >
                   <Chrome className="h-4 w-4" />
                   Continue with Google
@@ -230,6 +282,7 @@ export default function Auth() {
                   variant="ghost"
                   className="w-full"
                   onClick={handleGuestContinue}
+                  disabled={isLoading}
                 >
                   Continue as Guest
                 </Button>
