@@ -10,6 +10,7 @@ import { MedicalLoadingScreen } from "@/components/loading/MedicalLoadingScreen"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Search, Sparkles, ArrowRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useToast } from "@/hooks/use-toast";
 
 const commonSymptoms = [
   "Headache",
@@ -31,6 +32,7 @@ const commonSymptoms = [
 
 export default function Symptoms() {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedSymptoms, setSelectedSymptoms] = useState<string[]>([]);
   const [severity, setSeverity] = useState<Severity | null>(null);
@@ -56,22 +58,56 @@ export default function Symptoms() {
     }
   };
 
-  const handleAnalyze = () => {
+  const handleAnalyze = async () => {
     if (selectedSymptoms.length === 0 || !severity) return;
     
     setIsLoading(true);
     
-    // Simulate API call
-    setTimeout(() => {
-      setIsLoading(false);
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-symptoms`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            symptoms: selectedSymptoms,
+            severity,
+            notes,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || "Failed to analyze symptoms");
+      }
+
+      const data = await response.json();
+      
+      if (!data.diagnoses || data.diagnoses.length === 0) {
+        throw new Error("No diagnoses returned");
+      }
+
       navigate("/results", {
         state: {
           symptoms: selectedSymptoms,
           severity,
           notes,
+          diagnoses: data.diagnoses,
         },
       });
-    }, 3000);
+    } catch (error) {
+      console.error("Error analyzing symptoms:", error);
+      toast({
+        variant: "destructive",
+        title: "Analysis Failed",
+        description: error instanceof Error ? error.message : "Please try again later",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const canAnalyze = selectedSymptoms.length > 0 && severity !== null;
@@ -225,7 +261,7 @@ export default function Symptoms() {
             <Button
               size="lg"
               className="w-full gap-2"
-              disabled={!canAnalyze}
+              disabled={!canAnalyze || isLoading}
               onClick={handleAnalyze}
             >
               <Sparkles className="h-5 w-5" />

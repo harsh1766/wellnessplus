@@ -10,15 +10,14 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { saveDiagnosis } from "@/lib/diagnoses";
 
-// Mock diagnosis result - in real app, this would come from AI analysis
-const mockDiagnosis: Omit<DiagnosisData, "symptoms" | "severity" | "notes" | "createdAt"> = {
-  id: "temp",
-  disease: "Common Cold",
-  description: "A viral infection of the upper respiratory tract. Usually harmless and resolves within 7-10 days. Rest and hydration are recommended.",
-  medicines: ["Acetaminophen", "Decongestant", "Throat lozenges", "Vitamin C"],
-  aiScore: 0.85,
-  ruleScore: 0.78,
-};
+interface AIDiagnosis {
+  disease: string;
+  description: string;
+  commonSymptoms: string[];
+  medicines: string[];
+  confidence: number;
+  urgency: "low" | "medium" | "high";
+}
 
 export default function Results() {
   const location = useLocation();
@@ -26,14 +25,16 @@ export default function Results() {
   const { toast } = useToast();
   const { user } = useAuth();
   const [isSaving, setIsSaving] = useState(false);
+  const [selectedIndex, setSelectedIndex] = useState(0);
   
   const state = location.state as {
     symptoms: string[];
     severity: string;
     notes: string;
+    diagnoses: AIDiagnosis[];
   } | null;
 
-  if (!state) {
+  if (!state || !state.diagnoses) {
     return (
       <AppLayout>
         <div className="flex flex-col items-center justify-center min-h-[60vh] px-4">
@@ -50,13 +51,22 @@ export default function Results() {
     );
   }
 
-  const diagnosis: DiagnosisData = {
-    ...mockDiagnosis,
+  const diagnoses: DiagnosisData[] = state.diagnoses.map((d, i) => ({
+    id: `temp-${i}`,
+    disease: d.disease,
+    description: d.description,
     symptoms: state.symptoms,
     severity: state.severity as "mild" | "moderate" | "severe",
+    medicines: d.medicines,
+    aiScore: d.confidence,
+    ruleScore: d.confidence * 0.9,
     notes: state.notes,
     createdAt: new Date(),
-  };
+    urgency: d.urgency,
+    rank: i + 1,
+  }));
+
+  const selectedDiagnosis = diagnoses[selectedIndex];
 
   const handleSave = async () => {
     if (!user) {
@@ -73,14 +83,14 @@ export default function Results() {
 
     try {
       await saveDiagnosis({
-        disease: diagnosis.disease,
-        description: diagnosis.description,
-        symptoms: diagnosis.symptoms,
-        severity: diagnosis.severity,
-        medicines: diagnosis.medicines,
-        ai_score: diagnosis.aiScore,
-        rule_score: diagnosis.ruleScore,
-        notes: diagnosis.notes || null,
+        disease: selectedDiagnosis.disease,
+        description: selectedDiagnosis.description,
+        symptoms: selectedDiagnosis.symptoms,
+        severity: selectedDiagnosis.severity,
+        medicines: selectedDiagnosis.medicines,
+        ai_score: selectedDiagnosis.aiScore,
+        rule_score: selectedDiagnosis.ruleScore,
+        notes: selectedDiagnosis.notes || null,
       });
 
       toast({
@@ -98,6 +108,12 @@ export default function Results() {
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const getRankLabel = (index: number) => {
+    if (index === 0) return "Most Likely";
+    if (index === 1) return "Possible";
+    return "Less Likely";
   };
 
   return (
@@ -123,7 +139,7 @@ export default function Results() {
             Analysis Results
           </h1>
           <p className="text-muted-foreground text-sm">
-            Based on your symptoms, here's what we found
+            {diagnoses.length} possible conditions found based on your symptoms
           </p>
         </motion.div>
 
@@ -140,16 +156,33 @@ export default function Results() {
               <div>
                 <p className="font-medium text-success">Analysis Complete</p>
                 <p className="text-xs text-success/80">
-                  AI confidence: {Math.round(diagnosis.aiScore * 100)}%
+                  {diagnoses.length} conditions identified
                 </p>
               </div>
             </CardContent>
           </Card>
         </motion.div>
 
-        {/* Diagnosis Card */}
-        <div className="mb-6">
-          <DiagnosisCard diagnosis={diagnosis} />
+        {/* Diagnosis Cards */}
+        <div className="space-y-4 mb-6">
+          {diagnoses.map((diagnosis, index) => (
+            <motion.div
+              key={diagnosis.id}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 + index * 0.1 }}
+            >
+              <DiagnosisCard 
+                diagnosis={diagnosis} 
+                index={index}
+                rank={index + 1}
+                rankLabel={getRankLabel(index)}
+                isSelected={selectedIndex === index}
+                onSelect={() => setSelectedIndex(index)}
+                showSelectButton
+              />
+            </motion.div>
+          ))}
         </div>
 
         {/* Disclaimer */}
@@ -191,7 +224,7 @@ export default function Results() {
             ) : (
               <>
                 <Save className="h-5 w-5" />
-                {user ? "Save to History" : "Sign In to Save"}
+                {user ? `Save "${selectedDiagnosis.disease}"` : "Sign In to Save"}
               </>
             )}
           </Button>

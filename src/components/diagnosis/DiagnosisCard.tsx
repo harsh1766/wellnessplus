@@ -1,7 +1,8 @@
 import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Activity, Pill, Calendar, FileText, AlertTriangle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Activity, Pill, Calendar, FileText, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export interface DiagnosisData {
@@ -15,14 +16,29 @@ export interface DiagnosisData {
   ruleScore: number;
   notes?: string;
   createdAt: Date;
+  urgency?: "low" | "medium" | "high";
+  rank?: number;
 }
 
 interface DiagnosisCardProps {
   diagnosis: DiagnosisData;
   index?: number;
+  rank?: number;
+  rankLabel?: string;
+  isSelected?: boolean;
+  onSelect?: () => void;
+  showSelectButton?: boolean;
 }
 
-export function DiagnosisCard({ diagnosis, index = 0 }: DiagnosisCardProps) {
+export function DiagnosisCard({ 
+  diagnosis, 
+  index = 0, 
+  rank,
+  rankLabel,
+  isSelected,
+  onSelect,
+  showSelectButton = false
+}: DiagnosisCardProps) {
   const confidenceColor = 
     diagnosis.aiScore >= 0.8 ? "text-success" :
     diagnosis.aiScore >= 0.5 ? "text-warning" : "text-destructive";
@@ -33,23 +49,51 @@ export function DiagnosisCard({ diagnosis, index = 0 }: DiagnosisCardProps) {
     severe: { color: "bg-destructive/20 text-destructive border-destructive/30", label: "Severe" },
   };
 
+  const rankConfig: Record<number, { bg: string; text: string }> = {
+    1: { bg: "bg-primary/20", text: "text-primary" },
+    2: { bg: "bg-warning/20", text: "text-warning" },
+    3: { bg: "bg-muted", text: "text-muted-foreground" },
+  };
+
+  const getRankStyle = (r: number) => rankConfig[r] || rankConfig[3];
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.1 }}
     >
-      <Card variant="glass" className="overflow-hidden">
+      <Card 
+        variant="glass" 
+        className={cn(
+          "overflow-hidden transition-all cursor-pointer",
+          isSelected && "ring-2 ring-primary border-primary"
+        )}
+        onClick={onSelect}
+      >
         <CardHeader className="pb-3">
-          <div className="flex items-start justify-between">
-            <div className="space-y-1">
+          <div className="flex items-start justify-between gap-2">
+            <div className="space-y-1 flex-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                {rank && rankLabel && (
+                  <Badge className={cn("text-xs", getRankStyle(rank).bg, getRankStyle(rank).text)}>
+                    #{rank} {rankLabel}
+                  </Badge>
+                )}
+                {isSelected && showSelectButton && (
+                  <Badge className="bg-primary text-primary-foreground text-xs">
+                    <CheckCircle2 className="h-3 w-3 mr-1" />
+                    Selected
+                  </Badge>
+                )}
+              </div>
               <CardTitle className="text-lg">{diagnosis.disease}</CardTitle>
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <Calendar className="h-3 w-3" />
                 {diagnosis.createdAt.toLocaleDateString()}
               </div>
             </div>
-            <Badge className={cn("border", severityConfig[diagnosis.severity].color)}>
+            <Badge className={cn("border shrink-0", severityConfig[diagnosis.severity].color)}>
               {severityConfig[diagnosis.severity].label}
             </Badge>
           </div>
@@ -113,6 +157,21 @@ export function DiagnosisCard({ diagnosis, index = 0 }: DiagnosisCardProps) {
                 "{diagnosis.notes}"
               </p>
             </div>
+          )}
+
+          {/* Select Button */}
+          {showSelectButton && !isSelected && (
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="w-full mt-2"
+              onClick={(e) => {
+                e.stopPropagation();
+                onSelect?.();
+              }}
+            >
+              Select this diagnosis
+            </Button>
           )}
         </CardContent>
       </Card>
