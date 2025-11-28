@@ -1,5 +1,7 @@
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import { motion } from "framer-motion";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,19 +12,30 @@ import { Activity, Mail, Lock, User, ArrowLeft, Chrome, Loader2 } from "lucide-r
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
+import { loginSchema, signupSchema, LoginFormData, SignupFormData } from "@/lib/validations/auth";
 
 export default function Auth() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user, signIn, signUp, signInWithGoogle } = useAuth();
-  const [isLoading, setIsLoading] = useState(false);
-  
-  // Form state
-  const [loginEmail, setLoginEmail] = useState("");
-  const [loginPassword, setLoginPassword] = useState("");
-  const [signupName, setSignupName] = useState("");
-  const [signupEmail, setSignupEmail] = useState("");
-  const [signupPassword, setSignupPassword] = useState("");
+
+  // Login form
+  const loginForm = useForm<LoginFormData>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: { email: "", password: "" },
+    mode: "onBlur",
+  });
+
+  // Signup form
+  const signupForm = useForm<SignupFormData>({
+    resolver: zodResolver(signupSchema),
+    defaultValues: { name: "", email: "", password: "" },
+    mode: "onBlur",
+  });
+
+  const isLoginLoading = loginForm.formState.isSubmitting;
+  const isSignupLoading = signupForm.formState.isSubmitting;
+  const isLoading = isLoginLoading || isSignupLoading;
 
   // Redirect if already logged in
   useEffect(() => {
@@ -31,13 +44,8 @@ export default function Auth() {
     }
   }, [user, navigate]);
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-    
-    const { error } = await signIn(loginEmail, loginPassword);
-    
-    setIsLoading(false);
+  const handleLogin = async (data: LoginFormData) => {
+    const { error } = await signIn(data.email, data.password);
     
     if (error) {
       toast({
@@ -54,13 +62,8 @@ export default function Auth() {
     }
   };
 
-  const handleSignup = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-    
-    const { error } = await signUp(signupEmail, signupPassword, signupName);
-    
-    setIsLoading(false);
+  const handleSignup = async (data: SignupFormData) => {
+    const { error } = await signUp(data.email, data.password, data.name);
     
     if (error) {
       toast({
@@ -152,31 +155,41 @@ export default function Auth() {
 
                 {/* Login Tab */}
                 <TabsContent value="login">
-                  <form onSubmit={handleLogin} className="space-y-4">
+                  <form onSubmit={loginForm.handleSubmit(handleLogin)} className="space-y-4">
                     <div className="space-y-2">
-                      <div className="relative">
-                        <Mail className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                        <Input
-                          type="email"
-                          placeholder="Email address"
-                          className="pl-11"
-                          value={loginEmail}
-                          onChange={(e) => setLoginEmail(e.target.value)}
-                          required
-                          disabled={isLoading}
-                        />
+                      <div className="space-y-1">
+                        <div className="relative">
+                          <Mail className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                          <Input
+                            type="email"
+                            placeholder="Email address"
+                            className={`pl-11 ${loginForm.formState.errors.email ? 'border-destructive focus:border-destructive' : ''}`}
+                            {...loginForm.register("email")}
+                            disabled={isLoading}
+                          />
+                        </div>
+                        {loginForm.formState.errors.email && (
+                          <p className="text-xs text-destructive pl-1">
+                            {loginForm.formState.errors.email.message}
+                          </p>
+                        )}
                       </div>
-                      <div className="relative">
-                        <Lock className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                        <Input
-                          type="password"
-                          placeholder="Password"
-                          className="pl-11"
-                          value={loginPassword}
-                          onChange={(e) => setLoginPassword(e.target.value)}
-                          required
-                          disabled={isLoading}
-                        />
+                      <div className="space-y-1">
+                        <div className="relative">
+                          <Lock className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                          <Input
+                            type="password"
+                            placeholder="Password"
+                            className={`pl-11 ${loginForm.formState.errors.password ? 'border-destructive focus:border-destructive' : ''}`}
+                            {...loginForm.register("password")}
+                            disabled={isLoading}
+                          />
+                        </div>
+                        {loginForm.formState.errors.password && (
+                          <p className="text-xs text-destructive pl-1">
+                            {loginForm.formState.errors.password.message}
+                          </p>
+                        )}
                       </div>
                     </div>
 
@@ -185,7 +198,7 @@ export default function Auth() {
                       className="w-full"
                       disabled={isLoading}
                     >
-                      {isLoading ? (
+                      {isLoginLoading ? (
                         <>
                           <Loader2 className="h-4 w-4 animate-spin" />
                           Signing in...
@@ -199,44 +212,58 @@ export default function Auth() {
 
                 {/* Signup Tab */}
                 <TabsContent value="signup">
-                  <form onSubmit={handleSignup} className="space-y-4">
+                  <form onSubmit={signupForm.handleSubmit(handleSignup)} className="space-y-4">
                     <div className="space-y-2">
-                      <div className="relative">
-                        <User className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                        <Input
-                          type="text"
-                          placeholder="Full name"
-                          className="pl-11"
-                          value={signupName}
-                          onChange={(e) => setSignupName(e.target.value)}
-                          required
-                          disabled={isLoading}
-                        />
+                      <div className="space-y-1">
+                        <div className="relative">
+                          <User className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                          <Input
+                            type="text"
+                            placeholder="Full name"
+                            className={`pl-11 ${signupForm.formState.errors.name ? 'border-destructive focus:border-destructive' : ''}`}
+                            {...signupForm.register("name")}
+                            disabled={isLoading}
+                          />
+                        </div>
+                        {signupForm.formState.errors.name && (
+                          <p className="text-xs text-destructive pl-1">
+                            {signupForm.formState.errors.name.message}
+                          </p>
+                        )}
                       </div>
-                      <div className="relative">
-                        <Mail className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                        <Input
-                          type="email"
-                          placeholder="Email address"
-                          className="pl-11"
-                          value={signupEmail}
-                          onChange={(e) => setSignupEmail(e.target.value)}
-                          required
-                          disabled={isLoading}
-                        />
+                      <div className="space-y-1">
+                        <div className="relative">
+                          <Mail className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                          <Input
+                            type="email"
+                            placeholder="Email address"
+                            className={`pl-11 ${signupForm.formState.errors.email ? 'border-destructive focus:border-destructive' : ''}`}
+                            {...signupForm.register("email")}
+                            disabled={isLoading}
+                          />
+                        </div>
+                        {signupForm.formState.errors.email && (
+                          <p className="text-xs text-destructive pl-1">
+                            {signupForm.formState.errors.email.message}
+                          </p>
+                        )}
                       </div>
-                      <div className="relative">
-                        <Lock className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                        <Input
-                          type="password"
-                          placeholder="Password (min 6 characters)"
-                          className="pl-11"
-                          value={signupPassword}
-                          onChange={(e) => setSignupPassword(e.target.value)}
-                          required
-                          minLength={6}
-                          disabled={isLoading}
-                        />
+                      <div className="space-y-1">
+                        <div className="relative">
+                          <Lock className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                          <Input
+                            type="password"
+                            placeholder="Password (min 6 characters)"
+                            className={`pl-11 ${signupForm.formState.errors.password ? 'border-destructive focus:border-destructive' : ''}`}
+                            {...signupForm.register("password")}
+                            disabled={isLoading}
+                          />
+                        </div>
+                        {signupForm.formState.errors.password && (
+                          <p className="text-xs text-destructive pl-1">
+                            {signupForm.formState.errors.password.message}
+                          </p>
+                        )}
                       </div>
                     </div>
 
@@ -245,7 +272,7 @@ export default function Auth() {
                       className="w-full"
                       disabled={isLoading}
                     >
-                      {isLoading ? (
+                      {isSignupLoading ? (
                         <>
                           <Loader2 className="h-4 w-4 animate-spin" />
                           Creating account...
