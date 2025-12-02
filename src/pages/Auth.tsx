@@ -13,6 +13,7 @@ import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { loginSchema, signupSchema, LoginFormData, SignupFormData } from "@/lib/validations/auth";
+import { hasPendingDiagnosis, getPendingDiagnosis } from "@/lib/pendingDiagnosis";
 
 export default function Auth() {
   const navigate = useNavigate();
@@ -40,6 +41,30 @@ export default function Auth() {
   // Redirect if already logged in
   useEffect(() => {
     if (user) {
+      // If there's a pending diagnosis, redirect to results with the data
+      if (hasPendingDiagnosis()) {
+        const pending = getPendingDiagnosis();
+        if (pending) {
+          // Navigate to results - the Results page will auto-save
+          navigate("/results", { 
+            state: {
+              symptoms: pending.symptoms,
+              severity: pending.severity,
+              notes: pending.notes,
+              diagnoses: [{
+                disease: pending.disease,
+                description: pending.description,
+                commonSymptoms: [],
+                medicines: pending.medicines,
+                confidence: pending.aiScore,
+                urgency: pending.urgency
+              }]
+            }
+          });
+          return;
+        }
+      }
+      // Otherwise go to home
       navigate("/");
     }
   }, [user, navigate]);
@@ -58,7 +83,7 @@ export default function Auth() {
         title: "Welcome back!",
         description: "You've successfully signed in.",
       });
-      navigate("/");
+      // Navigation handled by useEffect
     }
   };
 
@@ -76,7 +101,7 @@ export default function Auth() {
         title: "Account created!",
         description: "Welcome to Wellness+. You're now signed in.",
       });
-      navigate("/");
+      // Navigation handled by useEffect
     }
   };
 

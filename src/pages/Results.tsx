@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { AppLayout } from "@/components/layout/AppLayout";
@@ -9,6 +9,7 @@ import { ArrowLeft, Save, AlertCircle, CheckCircle, Loader2 } from "lucide-react
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { saveDiagnosis } from "@/lib/diagnoses";
+import { savePendingDiagnosis, getPendingDiagnosis, clearPendingDiagnosis } from "@/lib/pendingDiagnosis";
 
 interface AIDiagnosis {
   disease: string;
@@ -68,8 +69,58 @@ export default function Results() {
 
   const selectedDiagnosis = diagnoses[selectedIndex];
 
+  // Auto-save pending diagnosis after user logs in
+  useEffect(() => {
+    const autoSavePendingDiagnosis = async () => {
+      if (user && selectedDiagnosis) {
+        const pending = getPendingDiagnosis();
+        if (pending) {
+          setIsSaving(true);
+          try {
+            await saveDiagnosis({
+              disease: selectedDiagnosis.disease,
+              description: selectedDiagnosis.description,
+              symptoms: selectedDiagnosis.symptoms,
+              severity: selectedDiagnosis.severity,
+              medicines: selectedDiagnosis.medicines,
+              ai_score: selectedDiagnosis.aiScore,
+              rule_score: selectedDiagnosis.ruleScore,
+              notes: selectedDiagnosis.notes || null,
+            });
+
+            clearPendingDiagnosis();
+            
+            toast({
+              title: "Diagnosis Saved",
+              description: "Your diagnosis has been saved to your history.",
+            });
+            
+            // Redirect to history after auto-save
+            setTimeout(() => {
+              navigate("/history");
+            }, 1500);
+          } catch (error) {
+            console.error("Error auto-saving diagnosis:", error);
+            toast({
+              variant: "destructive",
+              title: "Save failed",
+              description: "There was an error saving your diagnosis. Please try again.",
+            });
+          } finally {
+            setIsSaving(false);
+          }
+        }
+      }
+    };
+
+    autoSavePendingDiagnosis();
+  }, [user, selectedDiagnosis, navigate, toast]);
+
   const handleSave = async () => {
     if (!user) {
+      // Save pending diagnosis to localStorage before redirecting
+      savePendingDiagnosis(selectedDiagnosis);
+      
       toast({
         title: "Sign in required",
         description: "Please sign in to save your diagnosis to history.",
@@ -92,6 +143,8 @@ export default function Results() {
         rule_score: selectedDiagnosis.ruleScore,
         notes: selectedDiagnosis.notes || null,
       });
+
+      clearPendingDiagnosis();
 
       toast({
         title: "Diagnosis Saved",
